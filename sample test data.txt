@@ -1,0 +1,6 @@
+product,price,quantity,date
+Laptop,1200.50,5,2025-03-10
+Smartphone,750.00,10,2025-03-09
+Headphones,150.75,15,2025-03-08
+Tablet,300.00,7,2025-03-07
+Monitor,450.25,6,2025-03-06

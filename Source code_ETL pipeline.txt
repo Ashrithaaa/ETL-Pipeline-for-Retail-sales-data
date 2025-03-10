@@ -1,0 +1,71 @@
+import pandas as pd
+import requests
+import psycopg2
+import boto3
+
+# AWS Redshift Credentials (Replace with actual credentials)
+REDSHIFT_HOST = "your-redshift-cluster-endpoint"
+REDSHIFT_DB = "retail_db"
+REDSHIFT_USER = "your_username"
+REDSHIFT_PASSWORD = "your_password"
+REDSHIFT_PORT = 5439
+
+# Extract: Load data from CSV & Mock API
+def extract_data():
+    # Load local CSV (Mocked Sales Data)
+    sales_data = pd.read_csv("sales_data.csv")
+
+    # Fetch additional sales data from API (Mock API)
+    api_response = requests.get("https://mock-api.com/sales_data").json()
+    api_sales_data = pd.DataFrame(api_response)
+
+    # Combine Data
+    combined_sales_data = pd.concat([sales_data, api_sales_data], ignore_index=True)
+    return combined_sales_data
+
+# Transform: Data Cleaning & Processing
+def transform_data(df):
+    df.drop_duplicates(inplace=True)
+    df.fillna({"price": df["price"].mean()}, inplace=True)  # Fill missing prices with mean
+    df["date"] = pd.to_datetime(df["date"])  # Convert date format
+    return df
+
+# Load: Upload to AWS Redshift
+def load_to_redshift(df):
+    # Connect to Redshift
+    conn = psycopg2.connect(
+        dbname=REDSHIFT_DB, user=REDSHIFT_USER, password=REDSHIFT_PASSWORD,
+        host=REDSHIFT_HOST, port=REDSHIFT_PORT
+    )
+    cursor = conn.cursor()
+
+    # Create Table (if not exists)
+    create_table_query = """
+    CREATE TABLE IF NOT EXISTS sales (
+        id SERIAL PRIMARY KEY,
+        product VARCHAR(255),
+        price FLOAT,
+        quantity INT,
+        date DATE
+    );
+    """
+    cursor.execute(create_table_query)
+    conn.commit()
+
+    # Insert Data
+    for _, row in df.iterrows():
+        cursor.execute(
+            "INSERT INTO sales (product, price, quantity, date) VALUES (%s, %s, %s, %s)",
+            (row["product"], row["price"], row["quantity"], row["date"])
+        )
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# Run ETL Pipeline
+if __name__ == "__main__":
+    sales_df = extract_data()
+    cleaned_df = transform_data(sales_df)
+    load_to_redshift(cleaned_df)
+    print("ETL Pipeline Completed Successfully!")
